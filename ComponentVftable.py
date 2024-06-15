@@ -8,8 +8,16 @@
 import ghidra
 from docking.widgets.dialogs import InputDialog
 from ghidra.app.decompiler.flatapi import FlatDecompilerAPI
+from ghidra.app.util.cparser.C import CParser
 from ghidra.program.flatapi import FlatProgramAPI
 from ghidra.program.model.address import Address
+from ghidra.program.model.data import (
+	ArrayDataType,
+	DataTypeConflictHandler,
+	DataTypeManager,
+	StringDataType,
+	StructureDataType,
+)
 
 state = getState()
 program = state.getCurrentProgram()
@@ -59,7 +67,7 @@ def get_types_file():
 		field = line[28:].split(" ")[0]
 		if ty in type_defs.keys():
 			ty = type_defs[ty]
-		content[name][field] = ty
+		content[name][field] = (ty, line[125:].replace('"', ""))
 	return content
 
 
@@ -70,13 +78,23 @@ def do_vftable(addr, content):
 
 	ref = [x.getFromAddress() for x in fpapi.getReferencesTo(addr)][0]
 	fun = fpapi.getFunctionContaining(ref)
-	super_parent = fpapi.getFunctionContaining(
-		[x.getFromAddress() for x in fpapi.getReferencesTo(fun.getEntryPoint())][0]
-	)
-	super_parent_decomp = fdapi.decompile(super_parent)
-	size = hex_n(super_parent_decomp.split("operator_new(")[1].split(")")[0])
-	print(size)
+	super_parents = [
+		fpapi.getFunctionContaining(x.getFromAddress())
+		for x in fpapi.getReferencesTo(fun.getEntryPoint())
+	]
+	size = None
+	for super_parent in super_parents:
+		super_parent_decomp = fdapi.decompile(super_parent)
+		if "operator_new(" not in super_parent_decomp:
+			continue
+		if size is not None:
+			continue
+		size = hex_n(super_parent_decomp.split("operator_new(")[1].split(")")[0])
+
 	parent = fdapi.decompile(fun)
+	if size is None:
+		size = hex_n(parent.split("operator_new(")[1].split(")")[0])
+	print(size)
 	name = parent.split('"')[1]
 	print(name)
 	new_addr = addr.add(14 * 4)
@@ -97,6 +115,7 @@ def do_vftable(addr, content):
 		data["field"] = str(decompiled[:close])
 		decompiled = decompiled[close + 1 :]
 		lines = decompiled.split("}")[0].split("{")[1].split("\n")
+		# } stupid vim
 		for line in lines:
 			if "+" in line:
 				add = line.find("+")
@@ -115,9 +134,44 @@ def do_vftable(addr, content):
 
 	fields = content[name]
 	for thing in things:
-		thing["type"] = fields[thing["field"]]
-	return things
+		thing["type"] = fields[thing["field"]][0]
+		thing["comment"] = fields[thing["field"]][1]
+	return things, name, size
+
+
+def construct_structs(defs, name, size):
+	data_type_manager = currentProgram.getDataTypeManager()
+	struct = StructureDataType(name, size)
+	struct.replaceAtOffset(
+		0,
+		data_type_manager.getDataType("noita.exe/ComponentMysteryData"),
+		0x48,
+		"inherited_fields",
+		"",
+	)
+	defs.sort(lambda x, y: x["offset"] > y["offset"])
+	for thing in defs:
+		ty = data_type_manager.getDataType("/" + thing["type"])
+		if ty is None:
+			ty = data_type_manager.getDataType("noita.exe/" + thing["type"])
+		if ty is None:
+			ty = ArrayDataType(
+				data_type_manager.getDataType("/undefined1"), thing["size"], 1
+			)
+		print(thing["offset"], thing["field"])
+		struct.replaceAtOffset(
+			thing["offset"], ty, thing["size"], thing["field"], thing["comment"]
+		)
+	data_type_manager.addDataType(struct, DataTypeConflictHandler.DEFAULT_HANDLER)
+
+	# ty = data_type_manager.getDataType("/" + )
+	# parser = CParser(data_type_manager)
+	# parsed_datatype = parser.parse(struct_str)
+	# data_type_manager.addDataType(
+	# 	parsed_datatype, DataTypeConflictHandler.DEFAULT_HANDLER
+	# )
 
 
 content = get_types_file()
-print(do_vftable(currentAddress, content))
+things, name, size = do_vftable(currentAddress, content)
+construct_structs(things, name, size)
