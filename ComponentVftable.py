@@ -18,6 +18,7 @@ from ghidra.program.model.data import (
 	StringDataType,
 	StructureDataType,
 )
+from ghidra.program.model.listing import Program
 
 state = getState()
 program = state.getCurrentProgram()
@@ -50,19 +51,30 @@ def get_types_file():
 	content = open(file, "r").read()
 	lines = content.replace("\r", "").split("\n")
 	name = ""
-	content = {}
+	content = {
+		"ParticleEmitterComponent": {
+			"custom_style": "PARTICLE_EMITTER_CUSTOM_STYLE::Enum",
+			"m_cached_image_animation": "ParticleEmitter_Animation*",
+		},
+		"ExplosionComponent": {"trigger": "EXPLOSION_TRIGGER_TYPE::Enum"},
+		"InventoryComponent": {"update_listener": "InvenentoryUpdateListener*"},
+		"PathFindingComponent": {
+			"job_result_receiver": "MSG_QUEUE_PATH_FINDING_RESULT"
+		},
+	}
 	for line in lines:
 		if line == "":
 			continue
 		if line[0] != " ":
 			name = line
-			content[name] = {}
+			if name not in content.keys():
+				content[name] = {}
 			continue
 		if line[1] == "-":
 			continue
 		if line[27] != " ":
 			print("error missing seperator", line)
-			line = line[:27] + " " + line[28:]
+			continue
 		ty = "".join([x for x in line[:27].split(" ") if x != ""])
 		field = line[28:].split(" ")[0]
 		if ty in type_defs.keys():
@@ -71,7 +83,7 @@ def get_types_file():
 	return content
 
 
-def do_vftable(addr, content):
+def do_vftable(addr, content, name):
 	fpapi = FlatProgramAPI(program)
 
 	fdapi = FlatDecompilerAPI(fpapi)
@@ -92,11 +104,13 @@ def do_vftable(addr, content):
 		size = hex_n(super_parent_decomp.split("operator_new(")[1].split(")")[0])
 
 	parent = fdapi.decompile(fun)
+	derived_size = False
 	if size is None:
-		size = hex_n(parent.split("operator_new(")[1].split(")")[0])
-	print(size)
-	name = parent.split('"')[1]
-	print(name)
+		if "operator_new(" in parent:
+			size = hex_n(parent.split("operator_new(")[1].split(")")[0])
+		else:
+			derived_size = True
+			size = 0x48
 	new_addr = addr.add(14 * 4)
 	v = hex(fpapi.getInt(new_addr))
 	deref = fpapi.getAddressFactory().getAddress(v)
@@ -130,17 +144,21 @@ def do_vftable(addr, content):
 				num = line[:semi]
 				num = hex_n(num)
 				data["size"] = num
+				if derived_size:
+					size = max(size, num)
 		things.append(data)
 
 	fields = content[name]
 	for thing in things:
 		thing["type"] = fields[thing["field"]][0]
 		thing["comment"] = fields[thing["field"]][1]
-	return things, name, size
+	return things, size
 
 
 def construct_structs(defs, name, size):
 	data_type_manager = currentProgram.getDataTypeManager()
+	if data_type_manager.getDataType("noita.exe/" + name) is not None:
+		return
 	struct = StructureDataType(name, size)
 	struct.replaceAtOffset(
 		0,
@@ -158,7 +176,6 @@ def construct_structs(defs, name, size):
 			ty = ArrayDataType(
 				data_type_manager.getDataType("/undefined1"), thing["size"], 1
 			)
-		print(thing["offset"], thing["field"])
 		struct.replaceAtOffset(
 			thing["offset"], ty, thing["size"], thing["field"], thing["comment"]
 		)
@@ -172,6 +189,34 @@ def construct_structs(defs, name, size):
 	# )
 
 
+def get_all():
+	table = program.getSymbolTable()
+	addrs = []
+	for i in table.getClassNamespaces():
+		search = "Component"
+		n = i.name
+		if n[-len(search) :] != search or n == search:
+			continue
+		for s in table.getChildren(i.symbol):
+			if s.name != "vftable":
+				continue
+			addrs.append((s.address, n))
+	return addrs
+
+
 content = get_types_file()
-things, name, size = do_vftable(currentAddress, content)
-construct_structs(things, name, size)
+
+
+def do(pair):
+	try:
+		things, size = do_vftable(pair[0], content, pair[1])
+		construct_structs(things, pair[1], size)
+	except Exception as e:
+		print(e)
+		print(type(e))
+		print(pair[1], "failed")
+		pass
+
+
+# do_vftable(currentAddress, content, "AIAttackComponent")
+[do(x) for x in get_all()]
