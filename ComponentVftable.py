@@ -8,6 +8,7 @@
 import ghidra
 from docking.widgets.dialogs import InputDialog
 from ghidra.app.decompiler.flatapi import FlatDecompilerAPI
+from ghidra.app.script import GhidraState
 from ghidra.app.util.cparser.C import CParser
 from ghidra.program.flatapi import FlatProgramAPI
 from ghidra.program.model.address import Address
@@ -20,8 +21,18 @@ from ghidra.program.model.data import (
 )
 from ghidra.program.model.listing import Program
 
-state = getState()
+
+def get_state():
+	# type: () -> GhidraState
+	return getState()
+
+
+state = get_state()
 program = state.getCurrentProgram()
+
+fpapi = FlatProgramAPI(program)
+
+fdapi = FlatDecompilerAPI(fpapi)
 
 
 def hex_n(n):
@@ -84,9 +95,6 @@ def get_types_file():
 
 
 def do_vftable(addr, content, name):
-	fpapi = FlatProgramAPI(program)
-
-	fdapi = FlatDecompilerAPI(fpapi)
 
 	ref = [x.getFromAddress() for x in fpapi.getReferencesTo(addr)][0]
 	fun = fpapi.getFunctionContaining(ref)
