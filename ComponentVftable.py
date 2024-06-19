@@ -164,9 +164,7 @@ def do_vftable(addr, content, name):
 
 
 def construct_structs(defs, name, size):
-	data_type_manager = currentProgram.getDataTypeManager()
-	if data_type_manager.getDataType("noita.exe/" + name) is not None:
-		return
+	data_type_manager = program.getDataTypeManager()
 	struct = StructureDataType(name, size)
 	struct.replaceAtOffset(
 		0,
@@ -187,7 +185,7 @@ def construct_structs(defs, name, size):
 		struct.replaceAtOffset(
 			thing["offset"], ty, thing["size"], thing["field"], thing["comment"]
 		)
-	data_type_manager.addDataType(struct, DataTypeConflictHandler.DEFAULT_HANDLER)
+	data_type_manager.addDataType(struct, DataTypeConflictHandler.REPLACE_HANDLER)
 
 	# ty = data_type_manager.getDataType("/" + )
 	# parser = CParser(data_type_manager)
