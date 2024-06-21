@@ -32,3 +32,5 @@ print(type(state))
 program = state.getCurrentProgram()
 fpapi = FlatProgramAPI(program)
 fdapi = FlatDecompilerAPI(fpapi)
+
+import NoitaTypes

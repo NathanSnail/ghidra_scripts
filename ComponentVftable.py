@@ -6,7 +6,6 @@
 # @toolbar
 
 import ghidra
-from docking.widgets.dialogs import InputDialog
 from ghidra.app.decompiler.flatapi import FlatDecompilerAPI
 from ghidra.app.script import GhidraState
 from ghidra.app.util.cparser.C import CParser
@@ -33,7 +32,6 @@ program = state.getCurrentProgram()
 fpapi = FlatProgramAPI(program)
 
 fdapi = FlatDecompilerAPI(fpapi)
-
 
 def hex_n(n):
 	if n[0:2] == "0x":
