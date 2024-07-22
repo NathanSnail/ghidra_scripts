@@ -13,13 +13,9 @@ from ghidra.app.script import GhidraState
 from ghidra.app.util.cparser.C import CParser
 from ghidra.program.flatapi import FlatProgramAPI
 from ghidra.program.model.address import Address
-from ghidra.program.model.data import (
-	ArrayDataType,
-	DataTypeConflictHandler,
-	DataTypeManager,
-	StringDataType,
-	StructureDataType,
-)
+from ghidra.program.model.data import (ArrayDataType, DataTypeConflictHandler,
+									   DataTypeManager, StringDataType,
+									   StructureDataType)
 from ghidra.program.model.listing import Program
 
 
@@ -69,3 +65,4 @@ for k, part in enumerate(parts):
 		dt = fpapi.getDataTypes(m[ty])[0]
 		fpapi.clearListing(addr, addr.add(dt.getLength() - 1))
 		fpapi.createData(addr, dt)
+		fpapi.c
