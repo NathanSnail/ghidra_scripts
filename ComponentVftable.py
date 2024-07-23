@@ -33,6 +33,7 @@ fpapi = FlatProgramAPI(program)
 
 fdapi = FlatDecompilerAPI(fpapi)
 
+
 def hex_n(n):
 	if n[0:2] == "0x":
 		num = int(n, 16)
@@ -52,6 +53,7 @@ type_defs = {
 	"EntityID": "int",
 	"int16": "short",
 	"uint16": "ushort",
+	"GAME_EFFECT::Enum": "GameEffect",
 }
 
 
@@ -87,6 +89,7 @@ def get_types_file():
 		ty = "".join([x for x in line[:27].split(" ") if x != ""])
 		field = line[28:].split(" ")[0]
 		if ty in type_defs.keys():
+			print(ty)
 			ty = type_defs[ty]
 		content[name][field] = (ty, line[125:].replace('"', ""))
 	return content
@@ -173,6 +176,10 @@ def construct_structs(defs, name, size):
 	)
 	defs.sort(lambda x, y: x["offset"] > y["offset"])
 	for thing in defs:
+		ptr = False
+		if thing["type"][-1] == "*":
+			ptr = True
+			thing["type"] = thing["type"][:-1]
 		ty = data_type_manager.getDataType("/" + thing["type"])
 		if ty is None:
 			ty = data_type_manager.getDataType("noita.exe/" + thing["type"])
@@ -180,6 +187,8 @@ def construct_structs(defs, name, size):
 			ty = ArrayDataType(
 				data_type_manager.getDataType("/undefined1"), thing["size"], 1
 			)
+		if ptr:
+			ty = data_type_manager.getPointer(ty)
 		struct.replaceAtOffset(
 			thing["offset"], ty, thing["size"], thing["field"], thing["comment"]
 		)
