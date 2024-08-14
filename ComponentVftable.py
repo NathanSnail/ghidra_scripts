@@ -54,6 +54,7 @@ type_defs = {
 	"int16": "short",
 	"uint16": "ushort",
 	"GAME_EFFECT::Enum": "GameEffect",
+	"b2ObjectID": "b2Object*"
 }
 
 
