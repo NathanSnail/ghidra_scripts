@@ -51,6 +51,8 @@ for x in program.referenceManager.getReferencesTo(addr):
 	# print(src, x.fromAddress)
 	if name[-9:] != "Component" or '"class"' not in src:
 		continue
+	fun.setParentNamespace(fpapi.getNamespace(None, name))
+	fun.setName("TypeString", SourceType.ANALYSIS)
 	print(name)
 	refs = program.referenceManager.getReferencesTo(fun.entryPoint)
 	for ref in refs:
