@@ -139,7 +139,6 @@ def do_vftable(addr, content, name):
 		data["field"] = str(decompiled[:close])
 		decompiled = decompiled[close + 1 :]
 		lines = decompiled.split("}")[0].split("{")[1].split("\n")
-		# } stupid vim
 		for line in lines:
 			if "+" in line:
 				add = line.find("+")
