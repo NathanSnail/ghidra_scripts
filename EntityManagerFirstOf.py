@@ -45,29 +45,34 @@ entity = data_type_manager.getPointer(
 
 for x in program.referenceManager.getReferencesTo(addr):
 	fun = fpapi.getFunctionContaining(x.fromAddress)
+	prenamed = fun.parentNamespace.name
+	already_done = prenamed[-9:] == "Component"
 	src = fdapi.decompile(fun)
-	name = src.split("::RTTI")[0].split("&")[-1]
+	if already_done:
+		name = prenamed
+	else:
+		name = src.split("::RTTI")[0].split("&")[-1]
 	# if name == "WorldStateComponent":
 	# print(src, x.fromAddress)
 	if name[-9:] != "Component" or '"class"' not in src:
 		continue
-	fun.setParentNamespace(fpapi.getNamespace(None, name))
-	fun.setName("TypeString", SourceType.ANALYSIS)
-	print(name)
+	if not already_done:
+		fun.setParentNamespace(fpapi.getNamespace(None, name))
+		fun.setName("TypeString", SourceType.ANALYSIS)
 	refs = program.referenceManager.getReferencesTo(fun.entryPoint)
 	for ref in refs:
 		ref_fn = fpapi.getFunctionContaining(ref.fromAddress)
 		ref_src = fdapi.decompile(ref_fn)
 		if (
-			"0xf <" in ref_src
-			and "MutexBS" in ref_src
-			and "ComponentIdentifier" in ref_src
-			and "== 0" in ref_src
-			and "-1 <" in ref_src
-			and " & " not in ref_src
+			"0xf <" not in ref_src
+			or "MutexBS" not in ref_src
+			or "ComponentIdentifier" not in ref_src
+			or "== 0" not in ref_src
 		):
+			continue
+		print("thinker")
+		if "-1 <" in ref_src and " & " not in ref_src:
 			print("considering", ref_fn.name)
-			print(ref_src)
 			if (
 				"code **" not in ref_src
 				and "EntityManger" not in ref_src
@@ -85,9 +90,40 @@ for x in program.referenceManager.getReferencesTo(addr):
 				SourceType.ANALYSIS,
 			)
 			param = ref_fn.getParameters()[-1]
-			print(param)
 			if param.hasStackStorage():
 				param.setDataType(
 					entity,
 					SourceType.ANALYSIS,
 				)
+		else:
+			for double_ref in fpapi.getReferencesTo(ref_fn.entryPoint):
+				double_ref_fn = fpapi.getFunctionContaining(double_ref.fromAddress)
+				double_ref_src = fdapi.decompile(double_ref_fn)
+				if "-1 <" not in double_ref_src or " & " in double_ref_src:
+					continue
+				print("double reffing saneish")
+				if (
+					"code **" not in double_ref_src
+					and "EntityManger" not in double_ref_src
+					and "0x8000" not in double_ref_src
+				):
+					continue
+				print("double reffing done")
+				prefix = "FirstEnabled" if "0x8000" in ref_src else "First"
+				double_ref_fn.setParentNamespace(
+					fpapi.getNamespace(None, "EntityManager")
+				)
+				double_ref_fn.setName(prefix + name, SourceType.ANALYSIS)
+				print(name, "double reffed")
+				double_ref_fn.setReturnType(
+					data_type_manager.getPointer(
+						data_type_manager.getDataType("noita.exe/" + name)
+					),
+					SourceType.ANALYSIS,
+				)
+				param = double_ref_fn.getParameters()[-1]
+				if param.hasStackStorage():
+					param.setDataType(
+						entity,
+						SourceType.ANALYSIS,
+					)
