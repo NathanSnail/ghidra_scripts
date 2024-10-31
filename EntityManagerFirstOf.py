@@ -109,7 +109,7 @@ for x in program.referenceManager.getReferencesTo(addr):
 				):
 					continue
 				print("double reffing done")
-				prefix = "FirstEnabled" if "0x8000" in ref_src else "First"
+				prefix = "FirstEnabled" if "0x8000" in double_ref_src else "First"
 				double_ref_fn.setParentNamespace(
 					fpapi.getNamespace(None, "EntityManager")
 				)
