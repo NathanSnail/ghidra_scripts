@@ -64,6 +64,15 @@ while namespace and namespace.getParentNamespace() and not namespace.isGlobal():
     path += "/" + namespace.getName()
     namespace = namespace.getParentNamespace()
 
+def tinkerWithType(t):
+    # type: (DataType) -> DataType
+    name = t.name
+    if "WorldStateComponent" in name:
+        return dman.getPointer(dman.getDataType("noita.exe/Component"))
+    return t
+
+dirty = True
+
 data = listing.getDataAt(addr)
 data_type = data.getDataType()
 print(data_type, data_type.length)
@@ -74,17 +83,23 @@ for i in range(data_type.length // 4):
     function_address = item.getValue()
     function = fpapi.getFunctionAt(function_address)
     prototype = decomp_i.decompileFunction(function, 30, None).getHighFunction().getFunctionPrototype()
-    print(prototype)
-    fn_t = FunctionDefinitionDataType(function.getSignature())
-    fn_t.setReturnType(prototype.returnType)
+    ret_t = tinkerWithType(prototype.returnType)
+    sig = function.getSignature()
+    fn_t = FunctionDefinitionDataType(sig)
+    for arg in fn_t.arguments:
+        arg.setDataType(tinkerWithType(arg.dataType))
+    fn_t.setReturnType(ret_t)
     fn_t.setCategoryPath(cat)
-    dt = dman.addDataType(fn_t, DataTypeConflictHandler.REPLACE_HANDLER)
-    fields.append((dt, function.getName()))
+    if dirty:
+        dt = dman.addDataType(fn_t, DataTypeConflictHandler.REPLACE_HANDLER)
+        fields.append((dt, function.getName()))
 
 print(fields)
-struct = StructureDataType("vftable_struct", len(fields) * 4)
-struct.setCategoryPath(cat)
-for k, f in enumerate(fields):
-    print(f)
-    struct.replaceAtOffset(k * 4, PointerDataType(f[0]), 4, f[1], "")
-dt = dman.addDataType(struct, DataTypeConflictHandler.REPLACE_HANDLER)
+
+if dirty:
+    struct = StructureDataType("vftable_struct", len(fields) * 4)
+    struct.setCategoryPath(cat)
+    for k, f in enumerate(fields):
+        print(f)
+        struct.replaceAtOffset(k * 4, PointerDataType(f[0]), 4, f[1], "")
+    dt = dman.addDataType(struct, DataTypeConflictHandler.REPLACE_HANDLER)
