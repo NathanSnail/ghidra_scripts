@@ -69,6 +69,8 @@ def tinkerWithType(t):
     name = t.name
     if "WorldStateComponent" in name:
         return dman.getPointer(dman.getDataType("noita.exe/Component"))
+    if "ConfigGun" in name:
+        return dman.getPointer(dman.getDataType("noita.exe/ConfigBase"))
     return t
 
 dirty = True
